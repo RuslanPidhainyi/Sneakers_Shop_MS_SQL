@@ -1021,6 +1021,7 @@ select * from SizeForMen
 select * from Colours
 select * from Shoes
 select * from Solds
+Select * from SalesDates
 select * from Prices
 Select * from Positions
 
@@ -1052,21 +1053,30 @@ select FirstName, Surname, DateOfBirth  from Employees
 where DateOfBirth between '1992.01.01' and '1995.12.31' 
 
 
---3 Stowrzy kopie tablice Pracownik. Wyświetl tą tablice za pomocy UNION or UNION ALL, i pokaz dane: ID, Stanowisko, Nazwisko, Pesel. i posortuj tabele: Nazwisko i Pesel
 
---select ID, Stanowisko, Nazwisko, Pesel 
---into Pracownik_1 
---from Pracownik 
+--3 Create a copy of the Employee table. Display this table using UNION or UNION ALL, showing the following data: ID, FirstName, Surname, and Email. Sort the table by FirstName and Email.
+
+Select 
+	EmployeeID,
+	FirstName, 
+	Surname, 
+	Email
+Into CopyEmployees
+From Employees E
 
 
---select ID, Stanowisko, Nazwisko, Pesel from Pracownik  union
---select ID, Stanowisko, Nazwisko, Pesel from Pracownik_1 
---order by Nazwisko desc, Pesel asc
+--DROP TABLE CopyEmployees
+
+Select EmployeeID, FirstName, Surname, Email from CopyEmployees E
+union
+Select EmployeeID, FirstName, Surname, Email From Employees E
+Order by FirstName DESC, Email ASC
 
 
---select ID, Stanowisko, Nazwisko, Pesel from Pracownik  union all
---select ID, Stanowisko, Nazwisko, Pesel from Pracownik_1 
---order by Nazwisko desc, Pesel asc 
+Select EmployeeID, FirstName, Surname, Email from CopyEmployees E
+union all
+Select EmployeeID, FirstName, Surname, Email From Employees E 
+Order by FirstName DESC, Email ASC
 
 
 
@@ -1217,127 +1227,126 @@ Group By Sh.BrandName, Sh.Model
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
-                                                         /*widok*/
+                                                         /*VIEW*/
 
 
--- 1 Pokaz informacje KLienow i Spzedawcow(ich Imie i Nazwisko),  Buty (nazwe firmy 'adidas' i ich  Modele) i pokaz  do Butow ich cene
+/* 1 Show information about Customers and Sellers (their FirstName and LastName), 
+Shoes (the 'Adidas' brand and their Models), 
+along with the price of the shoes and the date the purchase was made by the customer. */
 
 
---Stworzy widok
+-- Creating a view
+Create View [dbo].[v_SoldShoes]
+AS
 
- create view [dbo].[v_SprzedanoButy]
- as 
-
- select Klient.Imie + ' ' + Klient.Nazwisko as K_ImieNazwisko,
-       Pracownik.Imie + ' ' + Pracownik.Nazwisko as P_ImieNazwisko,
-       Buty.NazwaFirmy + ' ' + Buty.Modele as B_NazwaModele,
-	   Sprzedano.Cena 
-	   from Sprzedano
-	                 left join Klient
-	                    on Sprzedano.KlientID = klient.ID
-					 left join Pracownik 
-					    on Sprzedano.PracownikID = Pracownik.ID 
-					 left join Buty
-					    on Sprzedano.ButyID = Buty.ID
-					
-						
-
-where Buty.NazwaFirmy = 'Adidas'
-group by Klient.ID, Klient.Imie + ' ' + Klient.Nazwisko, Pracownik.Imie + ' ' + Pracownik.Nazwisko, Buty.NazwaFirmy + ' ' + Buty.Modele, Sprzedano.Cena 
-
+Select 
+	E.FirstName + ' ' + E.Surname AS Employee,
+	C.FirstName + ' ' + C.Surname AS Client,
+	Sh.BrandName + ' ' + Sh.Model AS Shoes,
+	P.BasePrice AS Price,
+	P.DiscountPrice AS ' % ',
+	P.StartDate AS ' Start of discounts ',
+	P.EndDate AS ' End of discounts ',
+	Sa.SaleDate AS ' Sale date '
+from Shoes Sh 
+ Join Solds So ON Sh.ShoesID = So.ShoesID
+	Join SalesDates Sa ON So.SalesDateID = Sa.SalesDateID
+		Join Clients C ON So.ClientID = C.ClientID
+			Join Employees E ON So.EmployeeID = E.EmployeeID
+				Join Prices P ON Sh.ShoesID = P.ShoesID
+Where Sh.BrandName like 'Adidas%' and P.BasePrice Between 100 and 150 
 
 
+--Display the view
+Select * from v_SoldShoes Order by Client ASC
 
---Pokaz widok 
-select * from v_SprzedanoButy order by cena asc 
-
---Usun 
-IF OBJECT_ID('v_SprzedanoButy') IS NOT NULL
-DROP VIEW [dbo].[v_SprzedanoButy]
-
+--Delete 
+IF OBJECT_ID('v_SoldShoes') IS NOT NULL
+DROP VIEW [dbo].[v_SoldShoes]
 
 
+/*Shemat View Dynamiczny*/
 
+--Select PolaA, PolaB
+--From TabelaA
+--Where Pola_Id IN
+--	(Select PolaA, PolaB
+--	From TabelaB
+--	Where Pola_IdB IN
+--			(Select PolaB
+--			From TabelaC
+--			Where Pola_name = SESSION_CONTEXT(N'id')))
 
+--EXEC sp_set_session_context @key=N'Id', @Value = 'jakas wartosc'
 
-
-
--- 2 Pokaz Buty (Firme i modele) rodzaj butow 'Klasyczne', ilosc butow za taka cene i ich cene za jaką byli sprzedani
-
---tworzymy widok 
-
-CREATE VIEW [dbo].[v_ButyKlasyczny]
-as 
-
-select distinct Buty.NazwaFirmy + ' ' + Buty.Modele as B_NazwaModele,
-       RodzajButow.Nazwa  as R_Nazwa,
-	   count(Buty.NazwaFirmy) as 'ilosc butow za taka cene',
-	   Sprzedano.Cena as Cena
-	                           from Buty 
-							            left join RodzajButow 
-										          on Buty.RodzajButowID = RodzajButow.ID 
-                                         left join Sprzedano 
-										           on Buty.ID = Sprzedano.ButyID 
-
-where  Sprzedano.Cena  is not null and RodzajButow.Nazwa = 'Klasyczne'
-GROUP BY Buty.NazwaFirmy + ' ' + Buty.Modele,   RodzajButow.Nazwa, Sprzedano.Cena 
+--Delect * from (V_Sneakers)
 
 
 
+-- 2 Show Shoes (Brand and Models) of the 'Sneakers' type, the quantity of shoes at a given price, and the price they were sold for
 
+Create or Alter View [dbo].[V_Sneakers]
+AS
 
---wyswietl widok 
+Select Sh.BrandName, Sh.Model, CS.NameCategory, COUNT(So.ShoesID) AS 'Quantity Sold', P.BasePrice, Sa.SaleDate from Shoes Sh
+	Join CategoriesShoes CS ON Sh.CategoryID = CS.CategoryID
+		Join Solds So ON Sh.ShoesID = So.ShoesID
+			Join SalesDates Sa ON So.SalesDateID = Sa.SalesDateID
+				Join Prices P ON Sh.ShoesID = P.ShoesID
+Where CS.NameCategory like 'Sneakers'
+GROUP BY 
+    Sh.BrandName, 
+    Sh.Model, 
+    CS.NameCategory, 
+    P.BasePrice, 
+    Sa.SaleDate
 
-select * from v_ButyKlasyczny order by 'ilosc butow za taka cene' desc 
+Select * from V_Sneakers ORDER BY 'Quantity Sold' DESC
 
-
-
---Usun 
-IF OBJECT_ID('v_ButyKlasyczny') IS NOT NULL
-DROP VIEW [dbo].[v_ButyKlasyczny]
-
-
-
+IF OBJECT_ID('V_Sneakers') IS NOT NULL
+DROP VIEW [dbo].[V_Sneakers]
 
 
 
 
+--3 Show Shoes (Brand and Models) of the 'UltraBoost' type and their prices.
 
---3 Pokaz Buty (Firme i modele 'seria 452') i ich cene za ktorą sprzedali 
+Create or Alter View [dbo].[V_Model_UltraBoost]
+AS
 
+Select Distinct Sh.BrandName, Sh.Model, P.BasePrice
+from Shoes Sh Join Prices P ON Sh.ShoesID = P.ShoesID
+Where Sh.Model like 'UltraBoost'
 
+Select * from V_Model_UltraBoost 
 
---tworzymy widok 
-
-create view [dbo].[v_NewBalance_seria_452]
-as
-
-select B.NazwaFirmy, B.Modele, K.NazwaKoloru, R.Nazwa, S.Cena  from   Buty as B full join Kolory as K
-                                                                  on B.KolorID = K.ID 
-                                                                 full join RodzajButow as R
-																 on B.RodzajButowID = R.ID 
-																 full join Sprzedano as S
-																 on  B.ID = S.ButyID 
-where B.Modele =  'seria 452'
-group by B.NazwaFirmy, B.Modele, K.Nazwakoloru, R.Nazwa, S.Cena 
+IF OBJECT_ID('V_Model_UltraBoost') IS NOT NULL
+DROP VIEW [dbo].[V_Model_UltraBoost]
 
 
+---------------------------------------------------------------------------
+-- Display a view
+
+Select * from v_SoldShoes Order by Client ASC
+
+Select * from V_Sneakers ORDER BY 'Quantity Sold' DESC
+
+Select * from V_Model_UltraBoost 
+
+-- Delete a view
+
+IF OBJECT_ID('v_SoldShoes') IS NOT NULL
+DROP VIEW [dbo].[v_SoldShoes]
 
 
+IF OBJECT_ID('V_Sneakers') IS NOT NULL
+DROP VIEW [dbo].[V_Sneakers]
 
 
---wyswietl  widok 
+IF OBJECT_ID('V_Model_UltraBoost') IS NOT NULL
+DROP VIEW [dbo].[V_Model_UltraBoost]
 
-select * from v_NewBalance_seria_452 order by Cena asc
-
-
---Usun 
-IF OBJECT_ID('v_NewBalance_seria_452') IS NOT NULL
-DROP VIEW [dbo].[v_NewBalance_seria_452]
-
---lub
-
-DROP VIEW [dbo].[v_NewBalance_seria_452]
+---------------------------------------------------------------------------
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
