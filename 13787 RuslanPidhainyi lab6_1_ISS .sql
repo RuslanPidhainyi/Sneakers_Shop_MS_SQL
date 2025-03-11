@@ -1346,129 +1346,173 @@ DROP VIEW [dbo].[V_Sneakers]
 IF OBJECT_ID('V_Model_UltraBoost') IS NOT NULL
 DROP VIEW [dbo].[V_Model_UltraBoost]
 
----------------------------------------------------------------------------
-
-
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
                                                        /*Procedura*/
 
--- 1 stworzy procedure w ktorej mozna dodac klientow i informacje o nim w tabele klienci   
+-- 1 Create a procedure that allows adding clients  
 
-CREATE PROCEDURE [Proc_DodajKlienta]                                                       --piszemy parametry
-                
-				 @Nazwisko nvarchar(100),
-				 @Imie nvarchar(100),
-				 @Telefon nvarchar(25),
-				 @Email nvarchar(50),
-				 @Adres nvarchar(50),
-				 @Miasto nvarchar(50),
-				 @KodPocztowy nvarchar(50)
-AS
-BEGIN 
-                                     --cialo pszechowywanie parametrow
-INSERT Klient ( [Nazwisko], [Imie], [Telefon],[Email],[Adres],[Miasto], [KodPocztowy]) 
-VALUES( @Nazwisko, @Imie, @Telefon, @Email, @Adres, @Miasto, @KodPocztowy) 
+CREATE PROCEDURE [Proc_AddClient]    
+	@Surname NVARCHAR(20),
+	@FirstName NVARCHAR(20),
+	@Phone NVARCHAR(24),
+	@Email NVARCHAR(50) = NULL,
+	@Address  NVARCHAR(60) = NULL,
+	@City NVARCHAR(15) = NULL,
+	@Region VARCHAR(15) = NULL,
+	@PostalCode NVARCHAR(15) = NULL,
+	@Country NVARCHAR(15) = NULL
+AS 
+BEGIN
+	IF @Surname IS NULL OR @FirstName IS NULL OR @Phone IS NULL
+    BEGIN
+        THROW 50000, 'Surname, FirstName, and Phone are required.', 1;
+    END
+                                     
+INSERT INTO Clients ( [Surname], [Firstname], [Phone],[Email],[Address],[City], [Region], [PostalCode], [Country]) 
+VALUES( @Surname, @FirstName, @Phone, @Email, @Address, @City, @Region, @PostalCode, @Country) 
 
 END
 
+-- To use our procedure, you need to run the following command (this procedure is used to insert a new client into the Clients table)
+EXEC Proc_AddClient 'Kozak', 'Wiktoria', '953-123-657', 'kozakviktoria@gmail.com', 'ul. Filipa 9b', 'Krakow', 'Małopolska', '312-33', 'Poland' 
+EXEC Proc_AddClient 'Kozak', 'Rafal', '932-43-33', NULL, NULL, NULL, null 
+
+--Check the change
+select * from Clients 
+
+-- Delete the last two records from the client table.
+Delete from Clients where ClientID >= 11 
+
+-- Delete the procedure
+DROP PROCEDURE Proc_AddClient
 
 
 
+/* 2 Create a procedure that will display in a table the company name, shoe models, collaboration, 
+gender (male, female), color, size (EU, UK, cm), price, and show the quantity of those shoes. */
 
-
--- zeby wykorzystac nasze procedyre (ta procedura swozy do wpisywania dane w tabele 'Kolory' 
-EXEC Proc_DodajKlienta 'Kozak', 'Wiktoria', '953-123-657', 'kozakviktoria', 'ul. Filipa 9b', 'Krakow', '312-33' 
-EXEC Proc_DodajKlienta 'Kozak', 'Rafal', '932-43-33', 'rafalllhome@gmail.com', 'ul. Koszykarska 19', 'Krakow', null 
-
---sprzawdż zmiane
-select * from Klient 
-
-
--- Usun dwa ostatnich wiersza w tabele klient
-Delete from Klient where ID >= 16 
-
--- Zeby usunac procedure
-DROP PROCEDURE [Proc_DodajKlienta]
-
-
-
-
-
-
--- 2 Stworz procedure i pokaz w tabele Nazwafirmy butow 'New balance' i ich modele 'seria 452', rodzaj butow, Kolor, rozmiar EU i ich Cena i pokaz ilosc tych butow
-
-
-CREATE PROCEDURE [Proc_ListaButow] 
-@NazwaFirmy nvarchar (100),
-@Modele nvarchar (100),
-@Ilosc int OUTPUT
+CREATE PROCEDURE [Proc_ListSneakers]
+	@BrandName nvarchar(100),
+	@Model nvarchar(100),
+	@Count int OUTPUT
 AS
 BEGIN
-	SET NOCOUNT ON 
+	SET NOCOUNT ON
 
-	SET @Ilosc = (SELECT COUNT(*)
-					FROM Buty 
-					WHERE NazwaFirmy LIKE @NazwaFirmy AND Modele LIKE @Modele) 
-
-	SELECT Buty.NazwaFirmy, Buty.Modele, RB.Nazwa, K.NazwaKoloru, R.EU, S.Cena
-	FROM Buty 
-	         LEFT JOIN RodzajButow as RB
-			 ON Buty.RodzajButowID = RB.ID
-
-			 LEFT JOIN Kolory as K
-			 ON Buty.KolorID = K.ID
-
-			 LEFT JOIN Rozmiar as R
-			 ON Buty.RozmiarID = R.ID
-
-			 LEFT JOIN Sprzedano as S
-			 on Buty.ID = S.ButyID
-
-
-	WHERE NazwaFirmy LIKE @NazwaFirmy AND Modele LIKE @Modele and Buty.Modele = 'seria 452' AND  S.Cena IS NOT NULL
-
+	SET @Count = (SELECT COUNT(*)
+				  FROM Shoes
+				  WHERE BrandName LIKE '%' + @BrandName + '%' 
+				  AND Model LIKE '%' + @Model + '%')
+	SELECT 
+		Sh.BrandName,
+		Sh.Model,
+		Sh.Collaboration,
+		G.NameGender,
+		C.ColourName,
+		SFM.EU MenEU,
+		SFM.UK MenUK,
+		SFM.US MenUS,
+		SFM.cm MenCM,
+		SFW.EU WomenEU,
+		SFW.UK WomenUK,
+		SFW.US WomenUS,
+		SFW.cm WomenCM,
+		P.BasePrice,
+		P.DiscountPrice,
+		P.StartDate,
+		P.EndDate
+	FROM Shoes Sh
+	LEFT JOIN Gender G ON Sh.GenderID = G.GenderID 
+	LEFT JOIN Colours C ON Sh.ColourID = C.ColourID
+	LEFT JOIN SizeForMen SFM ON Sh.SizeMID = SFM.SizeID
+	LEFT JOIN SizeForWomen SFW ON Sh.SizeWID = SFW.SizeID
+	LEFT JOIN Prices P ON Sh.ShoesID = P.ShoesID
+	WHERE Sh.BrandName LIKE '%' + @BrandName + '%' 
+	AND Sh.Model LIKE '%' + @Model + '%'
 END
 
--- wyswitel
-DECLARE @Ilosc INT
-EXEC [Proc_ListaButow] 'New%', 'seria 452', @Ilosc OUTPUT  
-SELECT @Ilosc as Ilosc
+-- Provide the brand name and models
+DECLARE @Count INT
+EXEC Proc_ListSneakers 'Reebok', 'Club C 85', @Count OUTPUT
+SELECT @Count AS 'Count'
 
+DECLARE @Count INT
+EXEC Proc_ListSneakers 'Adidas', 'UltraBoost', @Count OUTPUT
+SELECT @Count AS 'Count'
 
---Usun 
-DROP PROCEDURE [Proc_ListaButow] 
+-- Delete the procedure
+DROP PROCEDURE Proc_ListSneakers	
 
+-- 3 Create a procedure in which you can select the shoe brand name, models, and their size range (from and to)
 
-
-
--- 3 Stworzy procedure w ktorej mozna wybrac NazweFirmy Butow, Modele, i Ich rozmiar od i do
-
-CREATE PROCEDURE [Proc_WyborButow] 
-@NazwaFirmy  nvarchar (100),
-@Modele nvarchar (100),
-@Od_EU decimal (8,2),
-@Do_EU decimal (8,2)
-
+CREATE PROCEDURE [Proc_SelectShoesBySize] 
+	@BrandName nvarchar(100),
+	@Model nvarchar(100),
+	@From_EU decimal (8,2),
+	@To_EU decimal (8,2)
 as
-select B.NazwaFirmy, B.Modele, R.EU from Rozmiar as R
-                                                         left join Buty as B
-														 on B.RozmiarID = R.ID 
+select 
+	Sh.BrandName,
+	Sh.Model, 
+	SFM.EU MenSizeEU,
+	SFW.EU WomenSizeEU
+FROM Shoes Sh 
+	LEFT JOIN SizeForMen SFM ON Sh.SizeMID = SFM.SizeID
+		LEFT JOIN SizeForWomen SFW ON Sh.SizeWID = SFW.SizeID                                                        														 
+WHERE 
+	Sh.BrandName LIKE '%' + @BrandName + '%' AND 
+	Sh.Model LIKE '%' + @Model + '%'  AND
+	( 
+		(SFM.EU >= @From_EU AND SFM.EU <= @To_EU) OR 
+		(SFW.EU >= @From_EU AND SFW.EU <= @To_EU)
+	)
+ORDER BY BrandName, Model, SFM.EU, SFW.EU
 
-where @NazwaFirmy like NazwaFirmy and @Modele like Modele and  EU >= @Od_EU and EU <= @Do_EU 
-Order by NazwaFirmy, Modele, EU
+
+
+-- Provide the brand name, models, and EU shoe size range (from and to)
+EXEC Proc_SelectShoesBySize  'Nike','Air Max', 42,43
+
+-- Delete the procedure
+DROP PROCEDURE Proc_SelectShoesBySize 
+
+---------------------------------------------------------------------------
+-- Display a Procedure
+
+-- To use our procedure, you need to run the following command (this procedure is used to insert a new client into the Clients table)
+EXEC Proc_AddClient 'Kozak', 'Wiktoria', '953-123-657', 'kozakviktoria@gmail.com', 'ul. Filipa 9b', 'Krakow', 'Małopolska', '312-33', 'Poland' 
+EXEC Proc_AddClient 'Kozak', 'Rafal', '932-43-33', NULL, NULL, NULL, null 
+
+-- Provide the brand name and models
+DECLARE @Count INT
+EXEC Proc_ListSneakers 'Reebok', 'Club C 85', @Count OUTPUT
+SELECT @Count AS 'Count'
+
+DECLARE @Count INT
+EXEC Proc_ListSneakers 'Adidas', 'UltraBoost', @Count OUTPUT
+SELECT @Count AS 'Count'
+
+-- Provide the brand name, models, and EU shoe size range (from and to)
+EXEC Proc_SelectShoesBySize  'Nike','Air Max', 42,43
 
 
 
---ustan  swoj rozmiar 
-EXEC Proc_WyborButow  'Adidas','Gazelle', 42,43
+-- Delete the procedure
 
---Usun
-DROP PROCEDURE [Proc_WyborButow] 
+-- Delete the last two records from the client table.
+Delete from Clients where ClientID >= 11 
 
+-- Delete the procedure
+IF OBJECT_ID('Proc_AddClient') IS NOT NULL
+DROP PROCEDURE Proc_AddClient
 
+-- Delete the procedure
+IF OBJECT_ID('Proc_ListSneakers') IS NOT NULL
+DROP PROCEDURE Proc_ListSneakers	
 
-
-
+-- Delete the procedure
+IF OBJECT_ID('Proc_SelectShoesBySize') IS NOT NULL
+DROP PROCEDURE Proc_SelectShoesBySize 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
                                                        /*Funkcji*/
 
@@ -1509,15 +1553,6 @@ SELECT * FROM F_Poszuk(395)
 DROP FUNCTION F_Poszuk
 
 
-
-
-
-
-
-  
-
-
-
 --2 stworz funkcje w ktorej ci pokaz ilosc butow konkratnej firmy bez kolobaracji
  
 
@@ -1543,14 +1578,6 @@ SELECT [dbo].[F_IloscButow] ('Adidas')
 
 --Usun 
 DROP FUNCTION F_IloscButow
-
-
-
-
-
-
-
-
 
 --3 stworzy funkcje. i znajdz za numerem '23' ID Butow,  klienta  
 
