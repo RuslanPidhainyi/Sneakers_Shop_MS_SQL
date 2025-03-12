@@ -1105,7 +1105,7 @@ Select
 from SalesDates SD
 Left join Solds So ON SD.SalesDateID = So.SalesDateID
 	Left join Shoes Sh ON So.ShoesID = Sh.ShoesID
-		Inner join Prices P ON Sh.ShoesID = P.PriceID
+		Inner join Prices P ON Sh.ShoesID = P.ShoesID
 Where SD.SaleDate like '____%'
 GROUP BY YEAR(SD.SaleDate), Sh.Model
 ORDER BY SaleYear ASC
@@ -1311,14 +1311,14 @@ DROP VIEW [dbo].[V_Sneakers]
 
 --3 Show Shoes (Brand and Models) of the 'UltraBoost' type and their prices.
 
-Create or Alter View [dbo].[V_Model_UltraBoost]
+CREATE or ALTER VIEW [dbo].[V_Model_UltraBoost]
 AS
 
-Select Distinct Sh.BrandName, Sh.Model, P.BasePrice
-from Shoes Sh Join Prices P ON Sh.ShoesID = P.ShoesID
-Where Sh.Model like 'UltraBoost'
+SELECT DISTINCT Sh.BrandName, Sh.Model, P.BasePrice
+FROM Shoes Sh Join Prices P ON Sh.ShoesID = P.ShoesID
+WHERE Sh.Model like 'UltraBoost'
 
-Select * from V_Model_UltraBoost 
+SELECT * FROM V_Model_UltraBoost 
 
 IF OBJECT_ID('V_Model_UltraBoost') IS NOT NULL
 DROP VIEW [dbo].[V_Model_UltraBoost]
@@ -1327,11 +1327,11 @@ DROP VIEW [dbo].[V_Model_UltraBoost]
 ---------------------------------------------------------------------------
 -- Display a view
 
-Select * from v_SoldShoes Order by Client ASC
+SELECT * FROM v_SoldShoes ORDER BY Client ASC
 
-Select * from V_Sneakers ORDER BY 'Quantity Sold' DESC
+SELECT * FROM V_Sneakers ORDER BY 'Quantity Sold' DESC
 
-Select * from V_Model_UltraBoost 
+SELECT * FROM V_Model_UltraBoost 
 
 -- Delete a view
 
@@ -1378,10 +1378,10 @@ EXEC Proc_AddClient 'Kozak', 'Wiktoria', '953-123-657', 'kozakviktoria@gmail.com
 EXEC Proc_AddClient 'Kozak', 'Rafal', '932-43-33', NULL, NULL, NULL, null 
 
 --Check the change
-select * from Clients 
+SELECT * FROM Clients 
 
 -- Delete the last two records from the client table.
-Delete from Clients where ClientID >= 11 
+DELETE FROM Clients WHERE ClientID >= 11 
 
 -- Delete the procedure
 DROP PROCEDURE Proc_AddClient
@@ -1451,7 +1451,7 @@ CREATE PROCEDURE [Proc_SelectShoesBySize]
 	@From_EU decimal (8,2),
 	@To_EU decimal (8,2)
 as
-select 
+SELECT 
 	Sh.BrandName,
 	Sh.Model, 
 	SFM.EU MenSizeEU,
@@ -1500,7 +1500,7 @@ EXEC Proc_SelectShoesBySize  'Nike','Air Max', 42,43
 -- Delete the procedure
 
 -- Delete the last two records from the client table.
-Delete from Clients where ClientID >= 11 
+DELETE from Clients WHERE ClientID >= 11 
 
 -- Delete the procedure
 IF OBJECT_ID('Proc_AddClient') IS NOT NULL
@@ -1514,102 +1514,118 @@ DROP PROCEDURE Proc_ListSneakers
 IF OBJECT_ID('Proc_SelectShoesBySize') IS NOT NULL
 DROP PROCEDURE Proc_SelectShoesBySize 
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------
-                                                       /*Funkcji*/
+                                                       /*Function*/
 
--- 1 Stworzy funkcje w ktorej mozesz wpisac Cena '395' i wyswietle ci dane: Imie Nazwisko Pracownika(Razem), Imie Nazwisko KLienta(Razem), NazwaFirmy, DataSprzedazy, Cena
+/* 1 Create a function where you can enter the price '100' and it will display the following data: 
+Customer's First Name, Last Name (Total), Email and Phone Number, 
+Employee's First Name, Last Name (Total) and Phone Number, Company Name and Model (Total), 
+Price, Discount, and Sale Date
+*/
 
--- stworz funknje 
+CREATE FUNCTION [F_Search]
+(@Price decimal(8,2))
 
-CREATE FUNCTION F_Poszuk
-(@Cena decimal(8,2))
-
-RETURNS TABLE 
+RETURNS TABLE
 AS
-RETURN 
-                 SELECT  Pracownik.Imie +' '+ Pracownik.Nazwisko as ImieNazwisko_Pracownika, 
-				         Klient.Imie + '  ' + Klient.Nazwisko as ImieNazwisko_Klienta,
-						 Buty.NazwaFirmy , DataZamowieniaSprzedazy.DataSprzedazy,
-				         Sprzedano.Cena FROM Sprzedano 
-				                       
-									    LEFT JOIN Pracownik 
-										ON Sprzedano.PracownikID = Pracownik.ID 
-										
-										LEFT JOIN Klient 
-										ON Sprzedano.KlientID = Klient.ID 
+RETURN
+	
+		SELECT
+			CONCAT (C.FirstName,' ', C.Surname) Client,
+			C.Email ClientEmail,
+			C.Phone ClientPhone,
+			CONCAT (E.FirstName,' ', E.Surname) Employee,
+			E.Phone EmployeePhone,
+			CONCAT (Sh.BrandName,' ', Sh.Model) Shoes,
+			P.BasePrice Price,
+			P.DiscountPrice '%',
+			SD.SaleDate
+		FROM Shoes Sh
+		JOIN Prices P ON Sh.ShoesID = P.ShoesID
+			JOIN Solds So ON Sh.ShoesID = So.ShoesID
+				JOIN Clients C ON So.ClientID = C.ClientID
+					JOIN Employees E ON So.EmployeeID = E.EmployeeID
+						JOIN SalesDates SD ON So.SalesDateID = SD.SalesDateID
+		WHERE P.BasePrice = @Price 
+			
+-- Display a Function
+SELECT * FROM F_Search(100)
 
-										LEFT JOIN Buty  
-										ON Sprzedano.ButyID = Buty.ID 
+-- Delete the Function
+DROP FUNCTION F_Search
 
-										LEFT JOIN DataZamowieniaSprzedazy
-										ON Sprzedano.DataZamowieniaSprzedazyID = DataZamowieniaSprzedazy.ID
-								
-				                 WHERE Sprzedano.Cena = @Cena 
-
-
---Pokaz wynik
-SELECT * FROM F_Poszuk(395)
-
--- usun funkcje 
-DROP FUNCTION F_Poszuk
-
-
---2 stworz funkcje w ktorej ci pokaz ilosc butow konkratnej firmy bez kolobaracji
+--2 Create a function that shows the number of shoes from a specific company without collaboration.
  
-
-CREATE FUNCTION [F_IloscButow] 
-(@NazwaFirmy nvarchar(100)) --Передается наш параметр 
-
+ CREATE OR ALTER FUNCTION [dbo].[F_NumberOfShoes] 
+(@BrandName NVARCHAR(100))
 RETURNS INT
 AS
 BEGIN 
-        
+    DECLARE @RESULT INT;
 
-	DECLARE @RESULT INT 
-	SELECT @RESULT = count(ID) FROM Buty 
-	where NazwaFirmy = @NazwaFirmy and  Kolobaracja is null
-	RETURN @RESULT 
+    SELECT @RESULT = COUNT(ShoesID)
+    FROM Shoes
+    WHERE BrandName = @BrandName;
 
-END
+    RETURN @RESULT;
+END;
 
+-- Display a Function
+SELECT dbo.F_NumberOfShoes('Reebok');
 
---Pokaz 
-SELECT [dbo].[F_IloscButow] ('Adidas')
-
-
---Usun 
-DROP FUNCTION F_IloscButow
-
---3 stworzy funkcje. i znajdz za numerem '23' ID Butow,  klienta  
+-- Delete the Function
+DROP FUNCTION F_NumberOfShoes
 
 
-CREATE FUNCTION F_Poszuk_Klienta
-(@Buty_ID int)
+--3 Create a function and find the shoe ID and customer ID for the number '23'  
 
-RETURNS TABLE 
+CREATE FUNCTION F_Search_Client 
+(@SneakersID INT)
+
+RETURNS TABLE
 AS
 RETURN 
-                 SELECT  Klient.Imie + '  ' + Klient.Nazwisko as ImieNazwisko_Klienta,
-				         Klient.Telefon,
-						 DataZamowieniaSprzedazy.DataSprzedazy,
-				         Sprzedano.Cena FROM Sprzedano 
-										
-										LEFT JOIN Klient 
-										ON Sprzedano.KlientID = Klient.ID 
-
-										LEFT JOIN DataZamowieniaSprzedazy
-										ON Sprzedano.DataZamowieniaSprzedazyID = DataZamowieniaSprzedazy.ID
-								
-				                 WHERE Sprzedano.ButyID = @Buty_ID
-
---Pokaz wynik
-SELECT * FROM  F_Poszuk_Klienta('23')
-
--- usun funkcje 
-DROP FUNCTION F_Poszuk_Klienta
+		SELECT 
+		CONCAT (C.FirstName,' ', C.Surname) Client,
+		Sh.ShoesID,
+		Sh.BrandName,
+		P.BasePrice Price,
+		SD.SaleDate
+		FROM Shoes Sh
+		JOIN Prices P ON Sh.ShoesID = P.ShoesID
+			JOIN Solds So ON Sh.ShoesID = So.ShoesID
+				JOIN Clients C ON So.ClientID = C.ClientID
+					JOIN SalesDates SD ON So.SalesDateID = SD.SalesDateID
+		WHERE Sh.ShoesID = @SneakersID
 
 
+-- Display a Function
+SELECT * FROM  F_Search_Client('23')
+
+-- Delete the Function
+DROP FUNCTION F_Search_Client
 
 
 
+
+---------------------------------------------------------------------------
+-- Display a Function
+
+SELECT * FROM F_Search(100)
+
+SELECT dbo.F_NumberOfShoes('Reebok')
+
+SELECT * FROM  F_Search_Client('23')
+
+
+-- Delete the Function
+
+IF OBJECT_ID('F_Search') IS NOT NULL
+DROP FUNCTION F_Search
+
+IF OBJECT_ID('F_NumberOfShoes') IS NOT NULL
+DROP FUNCTION F_NumberOfShoes	
+
+IF OBJECT_ID('F_Search_Client') IS NOT NULL
+DROP FUNCTION F_Search_Client 
 
 
