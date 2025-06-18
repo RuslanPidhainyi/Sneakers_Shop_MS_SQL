@@ -1,4 +1,4 @@
-## Contents 📋
+## Contents 📋:
 
 0. [Intro](#intro)
 1. [Database contains](#cont)
@@ -6,7 +6,7 @@
 3. [Data Manipulations: Queries, Functions, Procedures, and Views (a few examples)](#manipulation)
 
 <a name="intro"></a>
-## 0. Intro 👁️👁️
+## 0. Intro 👁️👁️:
 The Sneakers shop is a demo version of a database. I use Microsoft SQL Server for data storage, and the query language is Transact-SQL. In this project, I demonstrate my skills in database creation, data population, writing queries, and using Functions, Procedures, and Views. This project was completed in 2021 as part of the "Introduction to Databases" course.
 
 <a name="cont"></a>
